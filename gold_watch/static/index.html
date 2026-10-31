@@ -62,7 +62,9 @@
       <form id="settings-form">
         <div class="settings-grid">
           <article class="panel"><div class="panel-heading"><h2>国际金价早报</h2><label class="switch"><input id="international-enabled" type="checkbox"><span></span><em>启用</em></label></div>
-            <div class="form-row"><label>推送时间<input id="international-time" type="time" required></label><label>观察目标 · 美元/盎司<input id="international-target" type="number" min="0.01" max="1000000" step="0.01" placeholder="选填"></label></div>
+            <div class="form-row"><label>推送时间<input id="international-time" type="time" required></label><label>观察目标单位<select id="international-target-unit"><option value="original">美元/金衡盎司</option><option value="cny_per_gram">人民币/克</option></select></label></div>
+            <label><span id="international-target-label">观察目标 · 美元/金衡盎司</span><input id="international-target" type="number" min="0.01" max="1000000" step="0.01" placeholder="选填"></label>
+            <p class="subtle" id="international-target-help">按国际现货黄金的美元/金衡盎司报价比较目标。</p>
             <label>消息标题<input id="international-title" maxlength="60" required></label>
             <label>国际行情源<select id="international-provider"><option value="gold_api">Gold API · 免费聚合现货参考</option><option value="goldapi_io">GoldAPI.io · 需要 API Key</option></select></label>
             <label>消息模板<textarea id="international-template" rows="13" maxlength="3000" required spellcheck="false"></textarea></label>

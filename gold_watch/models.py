@@ -76,6 +76,7 @@ class Schedule(BaseModel):
     title: str = Field(min_length=1, max_length=60)
     template: str = Field(min_length=1, max_length=3000)
     target_price: Decimal | None = Field(default=None, gt=0, le=1000000)
+    target_unit: Literal["original", "cny_per_gram"] = "original"
     note: str = Field(default="实物金条价格另含溢价及费用。", max_length=300)
 
     @field_validator("time")

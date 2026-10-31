@@ -8,6 +8,7 @@ import httpx
 
 from .currency import conversion_details
 from .models import SHANGHAI, Quote, Schedule, Settings, now_local
+from .targets import target_details
 
 
 def report_title(kind: str, schedule: Schedule, *, manual=True):
@@ -24,20 +25,6 @@ def price_change(price, baseline, unit):
     return f"{delta:+.2f} {unit}（{delta / baseline * 100:+.2f}%）"
 
 
-def target_text(quote: Quote, schedule: Schedule):
-    if schedule.target_price is None:
-        return ""
-    target = schedule.target_price
-    gap = quote.price - target
-    prefix = f"观察目标：{target:.2f} {quote.unit}"
-    if gap > 0:
-        return f"{prefix}；距观察目标还差 {gap:.2f} {quote.unit}，约 {gap / target * 100:.2f}%（以目标价为基准）"
-    if gap == 0:
-        return f"{prefix}；当前参考价已达到目标"
-    return (f"{prefix}；当前参考价已低于目标 {-gap:.2f} {quote.unit}，"
-            f"约 {-gap / target * 100:.2f}%（以目标价为基准）")
-
-
 def render(quote: Quote, schedule: Schedule, settings: Settings, previous: Quote | None = None,
            *, manual=True, trend=""):
     at = now_local()
@@ -49,7 +36,7 @@ def render(quote: Quote, schedule: Schedule, settings: Settings, previous: Quote
     elif previous:
         change = (f"较上一份同来源成功推送：{price_change(quote.price, previous.price, quote.unit)}"
                   f"；基准 {previous.quote_time.astimezone(SHANGHAI):%m-%d %H:%M}")
-    target = target_text(quote, schedule)
+    target = target_details(quote, schedule, at)
     premium = ""
     if quote.kind == "domestic" and settings.domestic_premium > 0:
         premium = (f"按手动加价 {settings.domestic_premium:.2f} 元/克估算："
@@ -69,7 +56,7 @@ def render(quote: Quote, schedule: Schedule, settings: Settings, previous: Quote
         "quote_time": local_time.strftime(time_format) + "（北京时间）",
         "source": quote.source, "source_url": quote.source_url, "status": status,
         "change": change, "previous": f"{quote.previous_close:.2f}" if quote.previous_close else "暂无",
-        "target": target, "premium": premium, "note": schedule.note,
+        "target": target["text"] if target else "", "premium": premium, "note": schedule.note,
         "title": report_title(quote.kind, schedule, manual=manual), "trend": trend, "warnings": warnings,
         "conversion": conversion["text"] if conversion else "",
     }

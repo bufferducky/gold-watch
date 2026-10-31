@@ -11,6 +11,14 @@ def usable_rate(rate: ExchangeRate, at: datetime) -> bool:
     return at - MAX_RATE_AGE <= rate.updated_at <= at + timedelta(minutes=5)
 
 
+def cny_per_gram(quote: Quote, at: datetime | None = None) -> Decimal | None:
+    at = at or now_local()
+    if (quote.kind != "international" or quote.currency != "USD" or quote.unit != "美元/金衡盎司"
+            or quote.exchange_rate is None or not usable_rate(quote.exchange_rate, at)):
+        return None
+    return quote.price * quote.exchange_rate.rate / GRAMS_PER_TROY_OUNCE
+
+
 def conversion_details(quote: Quote, at: datetime | None = None):
     if quote.kind != "international":
         return None
@@ -21,7 +29,7 @@ def conversion_details(quote: Quote, at: datetime | None = None):
     if rate is None or not usable_rate(rate, at):
         reason = quote.conversion_error or "暂无有效美元兑人民币汇率"
         return {"available": False, "price": None, "text": f"人民币换算暂不可用：{reason}。"}
-    price = quote.price * rate.rate / GRAMS_PER_TROY_OUNCE
+    price = cny_per_gram(quote, at)
     local_time = rate.updated_at.astimezone(SHANGHAI)
     time_format = "%Y-%m-%d %H:%M" if local_time.year != at.year else "%m-%d %H:%M"
     rate_time = local_time.strftime(time_format) + "（北京时间）"

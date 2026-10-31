@@ -8,6 +8,7 @@ from .models import SHANGHAI, Quote, now_local
 from .providers import Providers, SourceError
 from .reports import SendFailure, SendUncertain, render, report_title, send_dingtalk
 from .store import Store
+from .targets import target_details
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +97,7 @@ class Service:
                          manual=manual, trend=trend["summary"])
         return {"quote": quote.model_dump(mode="json"), "status": quote.status(),
                 "title": report_title(kind, schedule, manual=manual), "message": message, "trend": trend,
-                "conversion": conversion_details(quote)}
+                "conversion": conversion_details(quote), "target": target_details(quote, schedule)}
 
     async def deliver(self, kind: str, slot: str | None = None):
         async with self.send_lock:

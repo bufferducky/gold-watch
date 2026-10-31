@@ -59,16 +59,9 @@ function drawQuote(kind, data) {
       }
     }
   }
-  const target = Number(currentState?.settings[kind].target_price);
   const targetNode = $("target-gap-" + kind);
-  targetNode.classList.toggle("hidden", !target);
-  if (target) {
-    const gap = Number(q.price) - target;
-    targetNode.textContent = `观察目标 ${target.toFixed(2)} ${q.unit} · ` + (gap > 0
-      ? `距观察目标还差 ${gap.toFixed(2)}，约 ${(gap / target * 100).toFixed(2)}%（以目标价为基准）`
-      : gap === 0 ? "当前参考价已达到目标"
-        : `当前参考价已低于目标 ${(-gap).toFixed(2)}，约 ${(-gap / target * 100).toFixed(2)}%（以目标价为基准）`);
-  }
+  targetNode.classList.toggle("hidden", !data.target);
+  targetNode.textContent = data.target?.text || "";
 }
 
 function svgNode(name, attributes, text) {
@@ -180,6 +173,8 @@ function hydrate(settings) {
     $(kind + "-note").value = schedule.note;
     $(kind + "-provider").value = settings[kind + "_provider"];
   }
+  $("international-target-unit").value = settings.international.target_unit || "original";
+  updateTargetLabel();
   $("catchup-minutes").value = settings.catchup_minutes;
   $("domestic-premium").value = settings.domestic_premium;
   $("allow-fallback").checked = settings.allow_fallback;
@@ -191,6 +186,16 @@ function hydrate(settings) {
   dirty = false;
   $("save-settings").textContent = "保存配置";
 }
+
+function updateTargetLabel() {
+  const cny = $("international-target-unit").value === "cny_per_gram";
+  $("international-target-label").textContent = cny ? "观察目标 · 人民币/克" : "观察目标 · 美元/金衡盎司";
+  $("international-target-help").textContent = cny
+    ? "按国际金价 × 美元兑人民币汇率 ÷ 31.1034768 比较目标，不计商家加价。汇率不可用时暂不判断。"
+    : "按国际现货黄金的美元/金衡盎司报价比较目标。";
+}
+
+$("international-target-unit").addEventListener("change", updateTargetLabel);
 
 function drawHistory(history) {
   const root = $("history-list");
@@ -327,6 +332,7 @@ $("settings-form").addEventListener("submit", (event) => {
         enabled: $(kind + "-enabled").checked, time: $(kind + "-time").value,
         target_price: $(kind + "-target").value || null, title: $(kind + "-title").value,
         template: $(kind + "-template").value, note: $(kind + "-note").value,
+        target_unit: kind === "international" ? $("international-target-unit").value : "original",
       };
       body[kind + "_provider"] = $(kind + "-provider").value;
     }

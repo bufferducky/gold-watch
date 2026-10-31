@@ -16,7 +16,7 @@ async function waitFor(predicate) {
   assert.fail('UI did not reach expected state');
 }
 
-async function createUI({trends = {}, latest = {}, target = null} = {}) {
+async function createUI({trends = {}, latest = {}, target = null, targetUnit = 'original'} = {}) {
   const dom = new JSDOM(html, {url: 'http://admin:temporary-test-password@localhost:8089/', runScripts: 'outside-only'});
   const win = dom.window;
   const schedule = time => ({enabled: true, time, title: '金价简报', template: '{price} {unit}', target_price: null, note: ''});
@@ -28,6 +28,7 @@ async function createUI({trends = {}, latest = {}, target = null} = {}) {
     goldapi_key_configured: false, juhe_key_configured: false,
   };
   settings.international.target_price = target;
+  settings.international.target_unit = targetUnit;
   const calls = [];
   let refresh;
   win.setInterval = fn => {refresh = fn; return 1;};
@@ -99,12 +100,46 @@ test('weekly chart leaves gaps, supports point inspection and shows daily sample
 test('target distance is shown using target price as the percentage baseline', async t => {
   const ui = await createUI({target: '100', latest: {international: {status: '周末参考', quote: {
     price: '110', unit: '美元/金衡盎司', quote_time: '2026-10-31T22:00:00+08:00', source: 'Test', warnings: [],
-  }}}});
+  }, target: {text: '观察目标：100.00 美元/金衡盎司；距观察目标还差 10.00 美元/金衡盎司，约 10.00%'}}}});
   t.after(() => ui.dom.window.close());
   const target = ui.win.document.getElementById('target-gap-international');
   assert.equal(target.classList.contains('hidden'), false);
-  assert.match(target.textContent, /距观察目标还差 10\.00，约 10\.00%/);
+  assert.match(target.textContent, /距观察目标还差 10\.00 美元\/金衡盎司，约 10\.00%/);
   assert.equal(ui.win.document.getElementById('target-gap-domestic').classList.contains('hidden'), true);
+});
+
+test('international target unit and amount save together and survive rehydration', async t => {
+  const ui = await createUI();
+  t.after(() => ui.dom.window.close());
+  const {document, Event} = ui.win;
+  const select = document.getElementById('international-target-unit');
+  select.value = 'cny_per_gram';
+  select.dispatchEvent(new Event('input', {bubbles: true}));
+  select.dispatchEvent(new Event('change', {bubbles: true}));
+  document.getElementById('international-target').value = '800';
+  assert.match(document.getElementById('international-target-label').textContent, /人民币\/克/);
+  assert.match(document.getElementById('international-target-help').textContent, /不计商家加价/);
+  document.getElementById('settings-form').dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+  await waitFor(() => ui.getSettings().international.target_unit === 'cny_per_gram');
+  await waitFor(() => document.getElementById('save-settings').textContent === '保存配置');
+  assert.equal(ui.getSettings().international.target_price, '800');
+  assert.equal(select.value, 'cny_per_gram');
+  assert.equal(document.getElementById('international-target').value, '800');
+  select.value = 'original';
+  select.dispatchEvent(new Event('change', {bubbles: true}));
+  assert.match(document.getElementById('international-target-label').textContent, /美元\/金衡盎司/);
+  assert.equal(document.getElementById('international-target').value, '800');
+});
+
+test('overview uses server target result rather than comparing dollars against yuan', async t => {
+  const text = '观察目标：800.00 元/克（国际金价人民币换算）；距观察目标还差 31.22 元/克，约 3.90%';
+  const ui = await createUI({target: '800', targetUnit: 'cny_per_gram', latest: {international: {
+    status: '周末参考', quote: {price: '3876.40', unit: '美元/金衡盎司', quote_time: '2026-10-31T23:30:00+08:00',
+      source: 'Test', warnings: []}, target: {text},
+  }}});
+  t.after(() => ui.dom.window.close());
+  assert.equal(ui.win.document.getElementById('target-gap-international').textContent, text);
+  assert.equal(ui.win.document.getElementById('international-target-unit').value, 'cny_per_gram');
 });
 
 test('international quote shows yuan per gram with FX source and update time', async t => {

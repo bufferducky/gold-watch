@@ -20,6 +20,7 @@ from .models import Kind, Settings, now_local
 from .providers import Providers, SourceError
 from .service import Service
 from .store import SECRET_FIELDS, Store
+from .targets import target_details
 
 STATIC = Path(__file__).parent / "static"
 basic = HTTPBasic()
@@ -119,11 +120,12 @@ def create_app(*, store=None, client=None, run_scheduler=True):
         at = now_local()
         for kind in ("international", "domestic"):
             quotes = db.recent_quotes(kind, limit=1)
+            schedule = getattr(settings, kind)
             latest[kind] = ({"quote": quotes[0].model_dump(mode="json"), "status": quotes[0].status(),
-                             "conversion": conversion_details(quotes[0], at)}
+                             "conversion": conversion_details(quotes[0], at),
+                             "target": target_details(quotes[0], schedule, at)}
                             if quotes else None)
             trends[kind] = db.trend(kind, quotes[0] if quotes else None, at)
-            schedule = getattr(settings, kind)
             if settings.scheduler_enabled and schedule.enabled:
                 hour, minute = map(int, schedule.time.split(":"))
                 next_at = at.replace(hour=hour, minute=minute, second=0, microsecond=0)

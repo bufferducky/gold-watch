@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#121613">
+  <title>Gold Watch · 金价观察</title>
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="Gold Watch 首页"><span class="brand-mark">G<span>·</span></span><span>GOLD WATCH<small>金价观察</small></span></a>
+    <div class="nav-label">工作台</div>
+    <nav aria-label="主导航">
+      <button class="nav-item active" data-page="overview"><span>◈</span>行情总览</button>
+      <button class="nav-item" data-page="settings"><span>⚙</span>推送与配置</button>
+      <button class="nav-item" data-page="history"><span>↗</span>推送记录</button>
+    </nav>
+    <div class="side-note"><span class="live-dot"></span> 自托管 · 数据留在本机<p>关注价格，耐心积累。</p><small>时区 Asia/Shanghai</small></div>
+  </aside>
+  <main>
+    <header class="topbar"><span id="breadcrumb">工作台 / 行情总览</span><span class="server-clock" id="server-clock">北京时间 · —</span></header>
+    <section class="page" id="page-overview">
+      <div class="page-heading"><div><div class="eyebrow">YOUR DAILY GOLD BRIEFING</div><h1>把握金价，从容积累<span>。</span></h1><p>国际现货看趋势，国内基准看成本。两份简报，各有所重。</p></div><button class="button secondary" id="refresh-state">↻ 更新状态</button></div>
+      <div class="schedule-banner"><div class="banner-icon">◷</div><div><strong id="schedule-label">定时推送已暂停</strong><p id="schedule-description">配置钉钉机器人后开启，每天收到两份金价简报。</p></div><button class="button" id="master-toggle">开启定时推送</button></div>
+      <div class="market-grid">
+        <article class="market-card" id="card-international">
+          <div class="card-top"><div><span class="market-label">GLOBAL MARKET</span><h2>国际现货黄金 <span>XAU / USD</span></h2></div><span class="pill">早间简报 <span id="time-international">08:00</span></span></div>
+          <div class="price-row"><strong id="price-international">—</strong><span>美元 / 金衡盎司</span></div>
+          <p class="quote-status" id="status-international">尚无报价，点击下方刷新并预览。</p>
+          <div class="card-divider"></div>
+          <dl><div><dt>报价时间</dt><dd id="quote-time-international">—</dd></div><div><dt>数据来源</dt><dd id="source-international">—</dd></div><div><dt>下次推送</dt><dd id="next-international">已暂停</dd></div></dl>
+          <div class="card-actions"><button class="button secondary" data-preview="international">刷新并预览</button><button class="text-button" data-send="international">立即推送 ↗</button></div>
+        </article>
+        <article class="market-card domestic" id="card-domestic">
+          <div class="card-top"><div><span class="market-label">DOMESTIC MARKET</span><h2>国内黄金基准 <span>Au99.99</span></h2></div><span class="pill">日盘简报 <span id="time-domestic">09:30</span></span></div>
+          <div class="price-row"><strong id="price-domestic">—</strong><span>人民币 / 克</span></div>
+          <p class="quote-status" id="status-domestic">尚无报价，点击下方刷新并预览。</p>
+          <div class="card-divider"></div>
+          <dl><div><dt>报价时间</dt><dd id="quote-time-domestic">—</dd></div><div><dt>数据来源</dt><dd id="source-domestic">—</dd></div><div><dt>下次推送</dt><dd id="next-domestic">已暂停</dd></div></dl>
+          <div class="card-actions"><button class="button secondary" data-preview="domestic">刷新并预览</button><button class="text-button" data-send="domestic">立即推送 ↗</button></div>
+        </article>
+      </div>
+      <div class="bottom-grid"><article class="panel preview-panel"><div class="panel-heading"><div><div class="eyebrow">MESSAGE PREVIEW</div><h2>简报预览</h2></div><span class="subtle" id="preview-title">刷新行情后展示实际消息内容</span></div><pre class="message-preview" id="message-preview">你的第一份金价简报，从这里开始。
+
+点击上方「刷新并预览」获取行情。
+预览不会向钉钉发送消息。</pre></article><article class="panel reading-note"><div class="eyebrow">READ THE PRICE RIGHT</div><h2>每个数字，都有时间。</h2><p>08:00 关注国际现货；国内简报默认在 09:30 日盘开市后推送。</p><p>周末、假期或来源异常时，可能展示最近有效报价。每份简报保留来源与报价时间。</p><p>Au99.99 是市场基准。实物金条的买入成本还包含销售加价，回购也有价差。</p><a href="https://www.sge.com.cn/sjzx/quotation_daily_new" target="_blank" rel="noopener noreferrer">查看上金所官方每日行情 ↗</a></article></div>
+    </section>
+
+    <section class="page hidden" id="page-settings">
+      <div class="page-heading"><div><div class="eyebrow">MAKE IT YOURS</div><h1>让简报适合你的节奏<span>。</span></h1><p>时间、来源与消息模板独立配置。所有时间均为北京时间。</p></div><button class="button" id="save-settings" form="settings-form" type="submit">保存配置</button></div>
+      <form id="settings-form">
+        <div class="settings-grid">
+          <article class="panel"><div class="panel-heading"><h2>国际金价早报</h2><label class="switch"><input id="international-enabled" type="checkbox"><span></span><em>启用</em></label></div>
+            <div class="form-row"><label>推送时间<input id="international-time" type="time" required></label><label>观察目标 · 美元/盎司<input id="international-target" type="number" min="0.01" max="1000000" step="0.01" placeholder="选填"></label></div>
+            <label>消息标题<input id="international-title" maxlength="60" required></label>
+            <label>国际行情源<select id="international-provider"><option value="gold_api">Gold API · 免费聚合现货参考</option><option value="goldapi_io">GoldAPI.io · 需要 API Key</option></select></label>
+            <label>消息模板<textarea id="international-template" rows="13" maxlength="3000" required spellcheck="false"></textarea></label>
+            <label>简报备注<textarea id="international-note" rows="2" maxlength="300"></textarea></label>
+          </article>
+          <article class="panel"><div class="panel-heading"><h2>国内金价观察</h2><label class="switch"><input id="domestic-enabled" type="checkbox"><span></span><em>启用</em></label></div>
+            <div class="form-row"><label>推送时间<input id="domestic-time" type="time" required></label><label>观察目标 · 元/克<input id="domestic-target" type="number" min="0.01" max="1000000" step="0.01" placeholder="选填"></label></div>
+            <label>消息标题<input id="domestic-title" maxlength="60" required></label>
+            <label>国内行情源<select id="domestic-provider"><option value="sina">新浪财经 · 免费非官方延时行情</option><option value="eastmoney">东方财富 · 免费非官方延时行情</option><option value="juhe">聚合数据 · 需要 API Key</option><option value="sge_daily">上金所官方 · 完整交易日收盘价</option></select></label>
+            <label>消息模板<textarea id="domestic-template" rows="13" maxlength="3000" required spellcheck="false"></textarea></label>
+            <label>简报备注<textarea id="domestic-note" rows="2" maxlength="300"></textarea></label>
+          </article>
+        </div>
+        <div class="variable-help">模板变量：<code>{price}</code> <code>{unit}</code> <code>{name}</code> <code>{date}</code> <code>{quote_time}</code> <code>{source}</code> <code>{source_url}</code> <code>{status}</code> <code>{change}</code> <code>{previous}</code> <code>{target}</code> <code>{premium}</code> <code>{note}</code><p>修改后先保存，再到总览预览。报价时间、来源、状态和单位即使从模板删除，也会追加到消息末尾。</p></div>
+        <div class="settings-grid">
+          <article class="panel"><div class="eyebrow">DELIVERY</div><h2>钉钉机器人</h2><p class="subtle">密钥字段留空表示保留，保存后不会回显。</p>
+            <label>Webhook 地址<input id="webhook" type="password" autocomplete="new-password" placeholder="https://oapi.dingtalk.com/robot/send?access_token=…"><span class="field-status" id="webhook-status"></span></label>
+            <label>加签密钥<input id="dingtalk-secret" type="password" autocomplete="new-password" placeholder="SEC…"><span class="field-status" id="dingtalk_secret-status"></span></label>
+            <p class="subtle">如机器人开启了关键词校验，请确保两份模板都包含该关键词。</p>
+            <label class="check-label"><input id="clear-webhook" type="checkbox">清除已保存的 Webhook（请先暂停定时推送）</label>
+            <label class="check-label"><input id="clear-dingtalk_secret" type="checkbox">清除已保存的加签密钥</label>
+          </article>
+          <article class="panel"><div class="eyebrow">SOURCES & RECOVERY</div><h2>数据与恢复</h2>
+            <label>GoldAPI.io API Key<input id="goldapi-key" type="password" autocomplete="new-password"><span class="field-status" id="goldapi_key-status"></span></label>
+            <label>聚合数据 API Key<input id="juhe-key" type="password" autocomplete="new-password"><span class="field-status" id="juhe_key-status"></span></label>
+            <div class="form-row"><label>金条手动加价 · 元/克<input id="domestic-premium" type="number" min="0" max="10000" step="0.01"></label><label>重启补发窗口 · 分钟<input id="catchup-minutes" type="number" min="1" max="180" required></label></div>
+            <label class="check-label"><input id="allow-fallback" type="checkbox">来源失败时允许备用来源及本地历史缓存</label>
+            <p class="subtle">国内备用依次尝试新浪、上金所历史收盘价和本地缓存，会明确标注。手动加价只用于估算，不代表金条实际售价。</p>
+          </article>
+        </div>
+      </form>
+    </section>
+
+    <section class="page hidden" id="page-history">
+      <div class="page-heading"><div><div class="eyebrow">DELIVERY LOG</div><h1>每一次推送，都有记录<span>。</span></h1><p>区分成功、失败和结果不确定。结果不确定时，请先核对钉钉群消息。</p></div><button class="button secondary" id="refresh-history">↻ 更新记录</button></div>
+      <article class="panel"><div id="history-list" class="history-list"><p class="empty-state">暂无推送记录</p></div></article>
+    </section>
+    <footer><span>GOLD WATCH <b>·</b> 独立的金价观察站</span><span id="health-label">正在连接服务…</span></footer>
+  </main>
+</div>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>

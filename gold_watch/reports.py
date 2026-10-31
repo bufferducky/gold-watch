@@ -72,6 +72,7 @@ async def send_dingtalk(client: httpx.AsyncClient, settings: Settings, title: st
     try:
         response = await client.post(url, json={
             "msgtype": "markdown", "markdown": {"title": title, "text": message},
+            "at": {"isAtAll": True},
         })
     except (httpx.ConnectError, httpx.ConnectTimeout):
         raise SendFailure("连接钉钉失败，请检查网络后手动重发") from None

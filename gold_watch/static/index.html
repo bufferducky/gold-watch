@@ -71,7 +71,7 @@
         </div>
         <div class="variable-help">模板变量：<code>{price}</code> <code>{unit}</code> <code>{name}</code> <code>{date}</code> <code>{quote_time}</code> <code>{source}</code> <code>{source_url}</code> <code>{status}</code> <code>{change}</code> <code>{previous}</code> <code>{target}</code> <code>{premium}</code> <code>{note}</code><p>修改后先保存，再到总览预览。报价时间、来源、状态和单位即使从模板删除，也会追加到消息末尾。</p></div>
         <div class="settings-grid">
-          <article class="panel"><div class="eyebrow">DELIVERY</div><h2>钉钉机器人</h2><p class="subtle">密钥字段留空表示保留，保存后不会回显。</p>
+          <article class="panel"><div class="eyebrow">DELIVERY</div><h2>钉钉机器人</h2><p class="subtle">每次推送均 @所有人，定时和手动推送统一生效。密钥字段留空表示保留，保存后不会回显。</p>
             <label>Webhook 地址<input id="webhook" type="password" autocomplete="new-password" placeholder="https://oapi.dingtalk.com/robot/send?access_token=…"><span class="field-status" id="webhook-status"></span></label>
             <label>加签密钥<input id="dingtalk-secret" type="password" autocomplete="new-password" placeholder="SEC…"><span class="field-status" id="dingtalk_secret-status"></span></label>
             <p class="subtle">如机器人开启了关键词校验，请确保两份模板都包含该关键词。</p>

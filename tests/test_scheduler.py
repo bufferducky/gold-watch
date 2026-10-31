@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import datetime
 from unittest.mock import AsyncMock
 
@@ -41,6 +42,7 @@ def test_restart_and_repeated_tick_do_not_duplicate(store, quote):
         providers.fetch.return_value = quote
         sends = []
         def handler(request):
+            assert json.loads(request.content)["at"]["isAtAll"] is True
             sends.append(request)
             return httpx.Response(200, json={"errcode": 0})
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:

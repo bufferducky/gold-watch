@@ -10,10 +10,10 @@ SHANGHAI = ZoneInfo("Asia/Shanghai")
 Kind = Literal["international", "domestic"]
 FIELDS = {
     "date", "name", "price", "unit", "quote_time", "source", "source_url",
-    "status", "change", "previous", "target", "premium", "note",
+    "status", "change", "previous", "target", "premium", "note", "title", "trend", "warnings", "conversion",
 }
 
-INTERNATIONAL_TEMPLATE = """### 国际金价早报 · {date}
+LEGACY_INTERNATIONAL_TEMPLATE = """### 国际金价早报 · {date}
 **{name}：{price} {unit}**
 
 - 数据状态：{status}
@@ -26,7 +26,7 @@ INTERNATIONAL_TEMPLATE = """### 国际金价早报 · {date}
 {note}
 """
 
-DOMESTIC_TEMPLATE = """### 国内金价观察 · {date}
+LEGACY_DOMESTIC_TEMPLATE = """### 国内金价观察 · {date}
 **{name}：{price} {unit}**
 
 - 数据状态：{status}
@@ -40,6 +40,31 @@ DOMESTIC_TEMPLATE = """### 国内金价观察 · {date}
 {note}
 """
 
+PRE_CONVERSION_INTERNATIONAL_TEMPLATE = """### {title} · {date}
+**{price} {unit}**
+
+{name} · {status}
+
+{change}
+
+{target}
+
+{trend}
+
+上游更新：{quote_time}
+
+来源：[{source}]({source_url})
+
+{warnings}
+
+{note}
+"""
+
+INTERNATIONAL_TEMPLATE = PRE_CONVERSION_INTERNATIONAL_TEMPLATE.replace(
+    "**{price} {unit}**", "**{price} {unit}**\n\n{conversion}",
+)
+DOMESTIC_TEMPLATE = PRE_CONVERSION_INTERNATIONAL_TEMPLATE.replace("{trend}\n", "{premium}\n\n{trend}\n")
+
 
 def now_local() -> datetime:
     return datetime.now(SHANGHAI)
@@ -51,7 +76,7 @@ class Schedule(BaseModel):
     title: str = Field(min_length=1, max_length=60)
     template: str = Field(min_length=1, max_length=3000)
     target_price: Decimal | None = Field(default=None, gt=0, le=1000000)
-    note: str = Field(default="行情用于观察，实物金条成交价需另加销售溢价及费用。", max_length=300)
+    note: str = Field(default="实物金条价格另含溢价及费用。", max_length=300)
 
     @field_validator("time")
     @classmethod
@@ -113,6 +138,28 @@ class Settings(BaseModel):
         return self
 
 
+class ExchangeRate(BaseModel):
+    base: Literal["USD"] = "USD"
+    currency: Literal["CNY"] = "CNY"
+    rate: Decimal = Field(gt=0, le=100)
+    updated_at: datetime
+    next_update: datetime
+    fetched_at: datetime
+    source: str = "ExchangeRate-API（日更参考）"
+    source_url: str = "https://www.exchangerate-api.com/"
+    warnings: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def valid_times(self):
+        if any(value.tzinfo is None for value in (self.updated_at, self.next_update, self.fetched_at)):
+            raise ValueError("汇率时间必须包含时区")
+        if (self.updated_at - self.fetched_at).total_seconds() > 300:
+            raise ValueError("汇率更新时间不能在未来")
+        if not 0 < (self.next_update - self.updated_at).total_seconds() <= 2 * 86400:
+            raise ValueError("汇率下次更新时间异常")
+        return self
+
+
 class Quote(BaseModel):
     kind: Kind
     symbol: str
@@ -128,6 +175,8 @@ class Quote(BaseModel):
     previous_close: Decimal | None = Field(default=None, gt=0)
     trading_date: str | None = None
     warnings: list[str] = Field(default_factory=list)
+    exchange_rate: ExchangeRate | None = None
+    conversion_error: str = ""
 
     @field_validator("quote_time", "fetched_at")
     @classmethod
@@ -145,10 +194,15 @@ class Quote(BaseModel):
     def status(self, at: datetime | None = None) -> str:
         at = at or now_local()
         if self.price_type == "daily_close":
-            return f"历史收盘价 · 交易日 {self.trading_date}，非当前盘中价"
-        age = (at - self.quote_time).total_seconds()
-        if age > 20 * 60:
-            return "最近有效报价（距今超过 20 分钟，请核对休市及数据延迟）"
-        if at.weekday() >= 5:
-            return "周末参考报价（上游更新时间不代表市场正在交易）"
-        return "近期现货参考报价" if self.price_type == "spot" else "近期延时参考报价"
+            status = f"历史收盘价 · 交易日 {self.trading_date}，非当前盘中价"
+        elif (at - self.quote_time).total_seconds() > 20 * 60:
+            status = "最近有效报价 · 超过 20 分钟未更新"
+        elif at.weekday() >= 5:
+            status = "周末参考"
+        else:
+            status = "现货参考" if self.price_type == "spot" else "延时参考"
+        if any("本地历史缓存" in warning for warning in self.warnings):
+            status = "本地缓存 · " + status
+        elif any("备用来源" in warning for warning in self.warnings):
+            status = "备用来源 · " + status
+        return status

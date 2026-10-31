@@ -30,19 +30,26 @@
         <article class="market-card" id="card-international">
           <div class="card-top"><div><span class="market-label">GLOBAL MARKET</span><h2>国际现货黄金 <span>XAU / USD</span></h2></div><span class="pill">早间简报 <span id="time-international">08:00</span></span></div>
           <div class="price-row"><strong id="price-international">—</strong><span>美元 / 金衡盎司</span></div>
+          <div class="currency-reference hidden" id="conversion-international"><strong id="cny-price-international"></strong><p id="exchange-rate-international"></p><a id="exchange-source-international" href="https://www.exchangerate-api.com/" target="_blank" rel="noopener noreferrer">汇率来源：ExchangeRate-API（日更参考） ↗</a><p class="subtle">国际金价换算参考，实物金条价格另含溢价及费用。</p></div>
           <p class="quote-status" id="status-international">尚无报价，点击下方刷新并预览。</p>
+          <p class="target-gap hidden" id="target-gap-international"></p>
           <div class="card-divider"></div>
-          <dl><div><dt>报价时间</dt><dd id="quote-time-international">—</dd></div><div><dt>数据来源</dt><dd id="source-international">—</dd></div><div><dt>下次推送</dt><dd id="next-international">已暂停</dd></div></dl>
+          <dl><div><dt>上游更新 · 北京时间</dt><dd id="quote-time-international">—</dd></div><div><dt>数据来源</dt><dd id="source-international">—</dd></div><div><dt>下次推送</dt><dd id="next-international">已暂停</dd></div></dl>
           <div class="card-actions"><button class="button secondary" data-preview="international">刷新并预览</button><button class="text-button" data-send="international">立即推送 ↗</button></div>
         </article>
         <article class="market-card domestic" id="card-domestic">
           <div class="card-top"><div><span class="market-label">DOMESTIC MARKET</span><h2>国内黄金基准 <span>Au99.99</span></h2></div><span class="pill">日盘简报 <span id="time-domestic">09:30</span></span></div>
           <div class="price-row"><strong id="price-domestic">—</strong><span>人民币 / 克</span></div>
           <p class="quote-status" id="status-domestic">尚无报价，点击下方刷新并预览。</p>
+          <p class="target-gap hidden" id="target-gap-domestic"></p>
           <div class="card-divider"></div>
-          <dl><div><dt>报价时间</dt><dd id="quote-time-domestic">—</dd></div><div><dt>数据来源</dt><dd id="source-domestic">—</dd></div><div><dt>下次推送</dt><dd id="next-domestic">已暂停</dd></div></dl>
+          <dl><div><dt>上游更新 · 北京时间</dt><dd id="quote-time-domestic">—</dd></div><div><dt>数据来源</dt><dd id="source-domestic">—</dd></div><div><dt>下次推送</dt><dd id="next-domestic">已暂停</dd></div></dl>
           <div class="card-actions"><button class="button secondary" data-preview="domestic">刷新并预览</button><button class="text-button" data-send="domestic">立即推送 ↗</button></div>
         </article>
+      </div>
+      <div class="market-grid trend-grid">
+        <article class="panel trend-panel"><div class="eyebrow">LAST 7 DAYS · XAU / USD</div><h2>国际金价 · 近7日</h2><div id="trend-international"><p class="empty-state">暂无历史数据</p></div></article>
+        <article class="panel trend-panel"><div class="eyebrow">LAST 7 DAYS · Au99.99</div><h2>国内金价 · 近7日</h2><div id="trend-domestic"><p class="empty-state">暂无历史数据</p></div></article>
       </div>
       <div class="bottom-grid"><article class="panel preview-panel"><div class="panel-heading"><div><div class="eyebrow">MESSAGE PREVIEW</div><h2>简报预览</h2></div><span class="subtle" id="preview-title">刷新行情后展示实际消息内容</span></div><pre class="message-preview" id="message-preview">你的第一份金价简报，从这里开始。
 
@@ -69,7 +76,7 @@
             <label>简报备注<textarea id="domestic-note" rows="2" maxlength="300"></textarea></label>
           </article>
         </div>
-        <div class="variable-help">模板变量：<code>{price}</code> <code>{unit}</code> <code>{name}</code> <code>{date}</code> <code>{quote_time}</code> <code>{source}</code> <code>{source_url}</code> <code>{status}</code> <code>{change}</code> <code>{previous}</code> <code>{target}</code> <code>{premium}</code> <code>{note}</code><p>修改后先保存，再到总览预览。报价时间、来源、状态和单位即使从模板删除，也会追加到消息末尾。</p></div>
+        <div class="variable-help">模板变量：<code>{title}</code> <code>{conversion}</code> <code>{price}</code> <code>{unit}</code> <code>{name}</code> <code>{date}</code> <code>{quote_time}</code> <code>{source}</code> <code>{source_url}</code> <code>{status}</code> <code>{change}</code> <code>{previous}</code> <code>{target}</code> <code>{premium}</code> <code>{trend}</code> <code>{warnings}</code> <code>{note}</code><p>修改后先保存，再到总览预览。来源、时间、状态、单位、人民币换算和数据提示即使从模板删除，也会追加到消息末尾。未配置的目标和加价自动省略；目标差距百分比以目标价为基准。默认标题在手动推送时显示「国际金价观察」，自定义标题保留。</p><p>涨跌优先对比来源上一交易日收盘，否则对比上一份同口径成功推送。近7日按北京时间每天最后一条采集报价统计，缺失日期留空，切换来源不拼接数据。仅在刷新预览或推送时采集；数据不足一周时按实际覆盖天数展示。</p></div>
         <div class="settings-grid">
           <article class="panel"><div class="eyebrow">DELIVERY</div><h2>钉钉机器人</h2><p class="subtle">每次推送均 @所有人，定时和手动推送统一生效。密钥字段留空表示保留，保存后不会回显。</p>
             <label>Webhook 地址<input id="webhook" type="password" autocomplete="new-password" placeholder="https://oapi.dingtalk.com/robot/send?access_token=…"><span class="field-status" id="webhook-status"></span></label>

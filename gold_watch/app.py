@@ -15,6 +15,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
+from .currency import conversion_details
 from .models import Kind, Settings, now_local
 from .providers import Providers, SourceError
 from .service import Service
@@ -114,12 +115,14 @@ def create_app(*, store=None, client=None, run_scheduler=True):
     async def state():
         db = app.state.store
         settings = db.settings()
-        latest, next_runs = {}, {}
+        latest, next_runs, trends = {}, {}, {}
         at = now_local()
         for kind in ("international", "domestic"):
             quotes = db.recent_quotes(kind, limit=1)
-            latest[kind] = ({"quote": quotes[0].model_dump(mode="json"), "status": quotes[0].status()}
+            latest[kind] = ({"quote": quotes[0].model_dump(mode="json"), "status": quotes[0].status(),
+                             "conversion": conversion_details(quotes[0], at)}
                             if quotes else None)
+            trends[kind] = db.trend(kind, quotes[0] if quotes else None, at)
             schedule = getattr(settings, kind)
             if settings.scheduler_enabled and schedule.enabled:
                 hour, minute = map(int, schedule.time.split(":"))
@@ -129,7 +132,7 @@ def create_app(*, store=None, client=None, run_scheduler=True):
                 next_runs[kind] = next_at.isoformat()
             else:
                 next_runs[kind] = None
-        return {"settings": db.public_settings(), "latest": latest, "next_runs": next_runs,
+        return {"settings": db.public_settings(), "latest": latest, "next_runs": next_runs, "trends": trends,
                 "history": db.history(), "server_time": at.isoformat(), "timezone": "Asia/Shanghai",
                 "scheduler": {"last_tick": app.state.service.last_tick, "error": app.state.service.last_error}}
 

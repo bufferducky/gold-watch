@@ -6,7 +6,19 @@ from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from .models import Quote, Settings, now_local
+from .models import (
+    DOMESTIC_TEMPLATE,
+    INTERNATIONAL_TEMPLATE,
+    LEGACY_DOMESTIC_TEMPLATE,
+    LEGACY_INTERNATIONAL_TEMPLATE,
+    PRE_CONVERSION_INTERNATIONAL_TEMPLATE,
+    SHANGHAI,
+    ExchangeRate,
+    Quote,
+    Settings,
+    now_local,
+)
+from .trends import same_series, weekly_trend
 
 SECRET_FIELDS = ("webhook", "dingtalk_secret", "goldapi_key", "juhe_key")
 
@@ -20,6 +32,7 @@ class Store:
             db.executescript("""
                 PRAGMA journal_mode=WAL;
                 CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY CHECK(id=1), body TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS exchange_rates (id INTEGER PRIMARY KEY CHECK(id=1), body TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS quotes (
                     id INTEGER PRIMARY KEY, kind TEXT NOT NULL, source TEXT NOT NULL,
                     quote_time TEXT NOT NULL, body TEXT NOT NULL,
@@ -32,6 +45,8 @@ class Store:
                     detail TEXT NOT NULL DEFAULT '', UNIQUE(kind, slot)
                 );
             """)
+            if "quote" not in {row[1] for row in db.execute("PRAGMA table_info(deliveries)")}:
+                db.execute("ALTER TABLE deliveries ADD COLUMN quote TEXT NOT NULL DEFAULT ''")
         if not self.has_settings():
             self.save_settings(Settings())
 
@@ -60,6 +75,14 @@ class Store:
                 data[name] = self.cipher.decrypt(data[name].encode()).decode() if data[name] else ""
         except InvalidToken as exc:
             raise RuntimeError("配置解密失败，请恢复原 APP_ENCRYPTION_KEY；不要重新生成密钥") from exc
+        # Upgrade only untouched defaults; preserve user-authored templates and notes.
+        for kind, old, new in (("international", LEGACY_INTERNATIONAL_TEMPLATE, INTERNATIONAL_TEMPLATE),
+                               ("international", PRE_CONVERSION_INTERNATIONAL_TEMPLATE, INTERNATIONAL_TEMPLATE),
+                               ("domestic", LEGACY_DOMESTIC_TEMPLATE, DOMESTIC_TEMPLATE)):
+            if data[kind]["template"] == old:
+                data[kind]["template"] = new
+            if data[kind]["note"] == "行情用于观察，实物金条成交价需另加销售溢价及费用。":
+                data[kind]["note"] = "实物金条价格另含溢价及费用。"
         return Settings.model_validate(data)
 
     def public_settings(self):
@@ -89,14 +112,39 @@ class Store:
                               (kind, limit)).fetchall()
         return [Quote.model_validate_json(row[0]) for row in rows]
 
+    def exchange_rate(self) -> ExchangeRate | None:
+        with self.db() as db:
+            row = db.execute("SELECT body FROM exchange_rates WHERE id=1").fetchone()
+        return ExchangeRate.model_validate_json(row[0]) if row else None
+
+    def save_exchange_rate(self, rate: ExchangeRate):
+        with self.db() as db:
+            db.execute("INSERT INTO exchange_rates(id,body) VALUES (1,?) "
+                       "ON CONFLICT(id) DO UPDATE SET body=excluded.body", (rate.model_dump_json(),))
+
     def previous_quote(self, quote: Quote):
-        # A change in source, contract, currency, or price type is a break in the series.
-        for old in self.recent_quotes(quote.kind):
-            if (old.source == quote.source and old.symbol == quote.symbol and old.unit == quote.unit
-                    and old.currency == quote.currency and old.price_type == quote.price_type
-                    and old.quote_time < quote.quote_time):
+        # Only confirmed successful deliveries are a comparison baseline, never previews.
+        with self.db() as db:
+            rows = db.execute("SELECT quote FROM deliveries WHERE kind=? AND status='success' "
+                              "AND quote!='' ORDER BY id DESC", (quote.kind,)).fetchall()
+        for row in rows:
+            old = Quote.model_validate_json(row[0])
+            if same_series(old, quote) and old.quote_time <= quote.quote_time:
                 return old
         return None
+
+    def trend(self, kind: str, reference: Quote | None = None, at: datetime | None = None):
+        at = at or now_local()
+        cutoff = datetime.combine(at.astimezone(SHANGHAI).date() - timedelta(days=6),
+                                  datetime.min.time(), SHANGHAI)
+        with self.db() as db:
+            rows = db.execute("SELECT body FROM quotes WHERE kind=? AND julianday(quote_time)>=julianday(?) "
+                              "AND julianday(quote_time)<=julianday(?)", (kind, cutoff.isoformat(), at.isoformat())).fetchall()
+        quotes = [Quote.model_validate_json(row[0]) for row in rows]
+        if reference is None:
+            recent = self.recent_quotes(kind, limit=1)
+            reference = recent[0] if recent else None
+        return weekly_trend(quotes, reference, at)
 
     def claim(self, kind: str, slot: str) -> int | None:
         now = now_local().isoformat()
@@ -105,10 +153,12 @@ class Store:
                                 "VALUES (?,?,'collecting',?,?)", (kind, slot, now, now))
             return cursor.lastrowid if cursor.rowcount else None
 
-    def delivery(self, delivery_id: int, status: str, *, title="", message="", detail=""):
+    def delivery(self, delivery_id: int, status: str, *, title="", message="", detail="", quote: Quote | None = None):
         with self.db() as db:
-            db.execute("UPDATE deliveries SET status=?,updated_at=?,title=?,message=?,detail=? WHERE id=?",
-                       (status, now_local().isoformat(), title, message, detail, delivery_id))
+            db.execute("UPDATE deliveries SET status=?,updated_at=?,title=?,message=?,detail=?, "
+                       "quote=COALESCE(?,quote) WHERE id=?",
+                       (status, now_local().isoformat(), title, message, detail,
+                        quote.model_dump_json() if quote else None, delivery_id))
 
     def recover(self):
         # A process may have died after the recipient accepted the message. Never auto-resend it.

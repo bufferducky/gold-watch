@@ -39,6 +39,7 @@ def test_restart_and_repeated_tick_do_not_duplicate(store, quote):
     async def run():
         store.save_settings(configured())
         providers = AsyncMock()
+        providers.fetch_usd_cny.side_effect = SourceError("测试未提供汇率")
         providers.fetch.return_value = quote
         sends = []
         def handler(request):
@@ -74,6 +75,7 @@ def test_pause_during_collection_cancels_send(store, quote):
             store.save_settings(settings)
             return quote
         providers = AsyncMock()
+        providers.fetch_usd_cny.side_effect = SourceError("测试未提供汇率")
         providers.fetch.side_effect = fetch
         async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: pytest.fail("must not send"))) as client:
             result = await Service(store, providers, client).deliver("international", "2026-10-30T08:00:00+08:00")
@@ -85,6 +87,7 @@ def test_source_failure_uses_cache_without_rewriting_quote_time(store, quote):
     async def run():
         store.save_quote(quote)
         providers = AsyncMock()
+        providers.fetch_usd_cny.side_effect = SourceError("测试未提供汇率")
         providers.fetch.side_effect = SourceError("source unavailable")
         service = Service(store, providers, None)
         cached = await service.collect("international")

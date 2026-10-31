@@ -7,7 +7,7 @@ from decimal import Decimal, InvalidOperation
 import httpx
 from bs4 import BeautifulSoup
 
-from .models import SHANGHAI, Quote, Settings, now_local
+from .models import SHANGHAI, ExchangeRate, Quote, Settings, now_local
 
 GOLD_API = "https://api.gold-api.com/price/XAU"
 GOLDAPI_IO = "https://www.goldapi.io/api/price/XAU/USD"
@@ -15,6 +15,7 @@ EASTMONEY = "https://push2.eastmoney.com/api/qt/stock/get"
 SINA = "https://hq.sinajs.cn/list=SGE_AU9999"
 SGE_DAILY = "https://www.sge.com.cn/sjzx/quotation_daily_new"
 JUHE = "https://web.juhe.cn/finance/gold/shgold"
+USD_CNY = "https://open.er-api.com/v6/latest/USD"
 
 
 class SourceError(Exception):
@@ -29,6 +30,20 @@ def number(value) -> Decimal:
         return result
     except (InvalidOperation, ValueError) as exc:
         raise SourceError("上游价格无效或为占位值") from exc
+
+
+def parse_usd_cny(data: dict, at: datetime) -> ExchangeRate:
+    try:
+        if data.get("result") != "success" or data.get("base_code") != "USD":
+            raise SourceError("汇率接口返回异常或基准币种不匹配")
+        return ExchangeRate(rate=number(data["rates"]["CNY"]),
+                            updated_at=datetime.fromtimestamp(int(data["time_last_update_unix"]), UTC),
+                            next_update=datetime.fromtimestamp(int(data["time_next_update_unix"]), UTC),
+                            fetched_at=at)
+    except SourceError:
+        raise
+    except (AttributeError, KeyError, ValueError, TypeError, OverflowError, OSError):
+        raise SourceError("美元兑人民币汇率字段异常") from None
 
 
 def parse_gold_api(data: dict, at: datetime) -> Quote:
@@ -138,6 +153,13 @@ def parse_sge_daily(html: str, at: datetime) -> Quote:
 class Providers:
     def __init__(self, client: httpx.AsyncClient):
         self.client = client
+
+    async def fetch_usd_cny(self) -> ExchangeRate:
+        try:
+            response = await self.get(USD_CNY)
+            return parse_usd_cny(response.json(), now_local())
+        except ValueError:
+            raise SourceError("美元兑人民币汇率响应无效") from None
 
     async def get(self, url, *, headers=None, params=None):
         # Fixed source URLs only; never accept arbitrary admin-provided fetch URLs.

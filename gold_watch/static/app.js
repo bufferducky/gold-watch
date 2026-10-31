@@ -39,9 +39,134 @@ function drawQuote(kind, data) {
   if (!data) return;
   const q = data.quote;
   $("price-" + kind).textContent = Number(q.price).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
-  $("quote-time-" + kind).textContent = formatDate(q.quote_time);
+  $("quote-time-" + kind).textContent = formatDate(q.quote_time, true);
   $("source-" + kind).textContent = q.source;
   $("status-" + kind).textContent = data.status + (q.warnings.length ? " · " + q.warnings.join("；") : "");
+  if (kind === "international") {
+    const conversion = data.conversion;
+    $("conversion-international").classList.toggle("hidden", !conversion);
+    if (conversion) {
+      $("cny-price-international").textContent = conversion.available
+        ? `折合人民币约 ${conversion.price} 元/克` : "人民币换算暂不可用";
+      $("exchange-rate-international").textContent = conversion.available
+        ? `1 美元 ≈ ${conversion.rate} 元人民币 · 更新于 ${formatDate(conversion.updated_at, true)}（北京时间）` +
+          (conversion.notes.length ? " · " + conversion.notes.join("；") : "")
+        : conversion.text;
+      $("exchange-source-international").classList.toggle("hidden", !conversion.available);
+      if (conversion.available) {
+        $("exchange-source-international").textContent = `汇率来源：${conversion.source} ↗`;
+        $("exchange-source-international").href = conversion.source_url;
+      }
+    }
+  }
+  const target = Number(currentState?.settings[kind].target_price);
+  const targetNode = $("target-gap-" + kind);
+  targetNode.classList.toggle("hidden", !target);
+  if (target) {
+    const gap = Number(q.price) - target;
+    targetNode.textContent = `观察目标 ${target.toFixed(2)} ${q.unit} · ` + (gap > 0
+      ? `距观察目标还差 ${gap.toFixed(2)}，约 ${(gap / target * 100).toFixed(2)}%（以目标价为基准）`
+      : gap === 0 ? "当前参考价已达到目标"
+        : `当前参考价已低于目标 ${(-gap).toFixed(2)}，约 ${(-gap / target * 100).toFixed(2)}%（以目标价为基准）`);
+  }
+}
+
+function svgNode(name, attributes, text) {
+  const node = document.createElementNS("http://www.w3.org/2000/svg", name);
+  for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function drawTrend(kind, trend) {
+  const root = $("trend-" + kind);
+  root.replaceChildren();
+  const samples = trend?.points.filter(point => point.price !== null) || [];
+  const summary = document.createElement("p");
+  summary.className = "trend-summary";
+  summary.textContent = trend?.summary || "近7日：暂无采集记录";
+  root.append(summary);
+  if (samples.length) {
+    const meta = document.createElement("p");
+    meta.className = "subtle trend-meta";
+    meta.textContent = `${trend.source} · ${trend.unit} · 日采样范围 ${Number(trend.low).toFixed(2)}–${Number(trend.high).toFixed(2)}`;
+    const readout = document.createElement("p");
+    readout.className = "trend-readout";
+    readout.setAttribute("aria-live", "polite");
+    const showPoint = point => {
+      readout.textContent = `${formatDate(point.quote_time, true)} · ${Number(point.price).toFixed(2)} ${trend.unit}`;
+    };
+    showPoint(samples[samples.length - 1]);
+    const chartLabel = kind === "international" ? "国际金价" : "国内金价";
+    const svg = svgNode("svg", {viewBox: "0 0 640 260", role: "img", "aria-label": `${chartLabel}最近7天价格采样折线图`, class: "trend-chart"});
+    svg.append(svgNode("title", {}, "每天最后一条采集报价；缺失日期留空。悬停或聚焦数据点查看详情。"));
+    const low = Number(trend.low), high = Number(trend.high);
+    const padding = Math.max((high - low) * 0.15, high * 0.0005, 0.01);
+    const min = low - padding, max = high + padding;
+    const x = index => 94 + index * 86;
+    const y = price => 202 - (Number(price) - min) / (max - min) * 174;
+    for (const value of [max, (min + max) / 2, min]) {
+      const position = y(value);
+      svg.append(svgNode("line", {x1: 94, y1: position, x2: 610, y2: position, class: "trend-gridline"}),
+        svgNode("text", {x: 82, y: position + 5, "text-anchor": "end", class: "trend-axis"}, value.toFixed(2)));
+    }
+    let segment = [];
+    const flush = () => {
+      if (segment.length > 1) svg.append(svgNode("polyline", {points: segment.join(" "), class: "trend-line"}));
+      segment = [];
+    };
+    trend.points.forEach((point, index) => {
+      svg.append(svgNode("text", {x: x(index), y: 240, "text-anchor": "middle", class: "trend-axis"}, point.date.slice(5)));
+      if (point.price === null) { flush(); return; }
+      segment.push(`${x(index)},${y(point.price)}`);
+    });
+    flush();
+    trend.points.forEach((point, index) => {
+      if (point.price === null) return;
+      const dot = svgNode("circle", {cx: x(index), cy: y(point.price), r: 6, tabindex: 0, class: "trend-point",
+        "aria-label": `${point.date} ${Number(point.price).toFixed(2)} ${trend.unit}`});
+      dot.append(svgNode("title", {}, `${point.date} · ${Number(point.price).toFixed(2)} ${trend.unit}`));
+      dot.addEventListener("mouseenter", () => showPoint(point));
+      dot.addEventListener("focus", () => showPoint(point));
+      dot.addEventListener("click", () => showPoint(point));
+      svg.append(dot);
+    });
+    root.append(meta, svg, readout);
+  } else {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "最近7天暂无同来源报价。刷新预览或推送后开始积累。";
+    root.append(empty);
+  }
+  const note = document.createElement("p");
+  note.className = "subtle";
+  note.textContent = trend?.note || "每天取最后一条采集报价，缺失日期留空。";
+  root.append(note);
+  if (trend?.points.length) {
+    const details = document.createElement("details");
+    details.className = "trend-data";
+    const label = document.createElement("summary");
+    label.textContent = "查看每日采样数据";
+    const table = document.createElement("table");
+    const caption = document.createElement("caption");
+    caption.textContent = `近7日 · ${trend.unit || "暂无报价"} · 北京时间`;
+    table.append(caption);
+    const heading = document.createElement("tr");
+    for (const text of ["日期", "价格", "上游更新"]) {
+      const th = document.createElement("th"); th.scope = "col"; th.textContent = text; heading.append(th);
+    }
+    const head = document.createElement("thead"); head.append(heading); table.append(head);
+    const body = document.createElement("tbody");
+    for (const point of trend.points) {
+      const row = document.createElement("tr");
+      for (const text of [point.date.slice(5), point.price === null ? "无记录" : Number(point.price).toFixed(2),
+        point.quote_time ? formatDate(point.quote_time, true) : "—"]) {
+        const cell = document.createElement("td"); cell.textContent = text; row.append(cell);
+      }
+      body.append(row);
+    }
+    table.append(body); details.append(label, table); root.append(details);
+  }
 }
 
 function hydrate(settings) {
@@ -100,7 +225,10 @@ function drawHistory(history) {
       summary.textContent = "查看消息内容";
       const pre = document.createElement("pre");
       pre.textContent = row.message;
-      details.append(summary, pre);
+      const batch = document.createElement("p");
+      batch.className = "subtle";
+      batch.textContent = "发送批次：" + row.slot;
+      details.append(summary, pre, batch);
       article.append(details);
     }
     root.append(article);
@@ -112,6 +240,7 @@ async function loadState(fillForm = false) {
   const s = currentState.settings;
   for (const kind of kinds) {
     drawQuote(kind, currentState.latest[kind]);
+    drawTrend(kind, currentState.trends?.[kind]);
     $("time-" + kind).textContent = s[kind].time;
     $("next-" + kind).textContent = currentState.next_runs[kind] ? formatDate(currentState.next_runs[kind], true) : "已暂停";
   }
